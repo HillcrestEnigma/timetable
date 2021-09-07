@@ -12,6 +12,8 @@ WORKDIR /app
 
 COPY requirements.txt /app/
 
+ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
+
 RUN python3 -m pip install -r requirements.txt
 
 COPY . /app/
