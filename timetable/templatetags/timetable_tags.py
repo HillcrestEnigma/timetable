@@ -27,7 +27,7 @@ def render_timetable(timetable):
             course_possibilities = i['position'][j].intersection(courses.keys())
             if len(course_possibilities) > 0:
                 course_id = list(course_possibilities)[0]
-                html += f'<td class="{color}">{courses[course_id]}</td>'
+                html += f'<td class="{color}"><a href="{courses[course_id].get_absolute_url()}">{courses[course_id]}</a></td>'
             else:
                 html += f'<td class="{color}">-</td>'
         html += '</tr>'
