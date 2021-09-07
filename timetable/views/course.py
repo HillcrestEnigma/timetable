@@ -85,9 +85,6 @@ class AddCourse(LoginRequiredMixin, UserPassesTestMixin, CreateView, mixins.Titl
 
     def test_func(self):
         term = get_object_or_404(models.Term, pk=self.kwargs['pk'])
-        if self.request.user.school != term.school:
-            return False
-        print(term.is_frozen)
         return not term.is_frozen
 
     def form_valid(self, form):
@@ -96,9 +93,12 @@ class AddCourse(LoginRequiredMixin, UserPassesTestMixin, CreateView, mixins.Titl
         model.save()
 
         return super().form_valid(form)
-    
+
     def get_success_url(self):
-        return reverse('add_timetable_select_courses', kwargs={'pk': self.kwargs['pk']})
+        if 'next' in self.request.GET:
+            return self.request.GET['next']
+        else:
+            return reverse('timetable_list')
 
     def get_form_kwargs(self):
         kwargs = super(CreateView, self).get_form_kwargs()

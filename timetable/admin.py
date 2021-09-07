@@ -3,6 +3,7 @@ from . import models
 from django.contrib.auth import get_user_model
 from django.forms import Textarea
 import django.db
+from .forms import TermAdminForm, EventAdminForm
 
 User = get_user_model()
 
@@ -26,6 +27,7 @@ class EventInline(admin.StackedInline):
     ordering = ['start_date']
     model = models.Event
     extra = 0
+    form = EventAdminForm
 
 class CourseInline(admin.TabularInline):
     formfield_overrides = {
@@ -41,6 +43,7 @@ class TermAdmin(admin.ModelAdmin):
         EventInline,
         CourseInline,
     ]
+    form = TermAdminForm
 
 admin.site.register(User)
 admin.site.register(models.Timetable)

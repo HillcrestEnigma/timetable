@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'captcha',
     'corsheaders',
+    'django_select2',
 ]
 
 MIDDLEWARE = [
@@ -85,11 +86,20 @@ WSGI_APPLICATION = 'courseshare.wsgi.application'
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-            }
-        }
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+
+
+# Cache
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
 
 
 # Password validation
@@ -137,26 +147,88 @@ AUTH_USER_MODEL = 'timetable.User'
 # Timetable settings
 
 TIMETABLE_FORMATS = {
-    '2019': {
-        'schedule': [
-            {'info': '08:45 - 10:05', 'position': [{1}, {1}]},
-            {'info': '10:15 - 11:30', 'position': [{2}, {2}]},
-            {'info': '12:30 - 13:45', 'position': [{3}, {4}]},
-            {'info': '13:50 - 15:05', 'position': [{4}, {3}]},
-        ],
-        'days': 2,
+    'pre-2020': {
+        'schedules': {
+            'default': [
+                {'description': '08:45 AM - 10:05 AM', 'time': [[8, 45], [10, 5]], 'position': [{1}, {1}]},
+                {'description': '10:15 AM - 11:30 AM', 'time': [[10, 15], [11, 30]], 'position': [{2}, {2}]},
+                {'description': '12:30 PM - 01:45 PM', 'time': [[12, 30], [13, 45]], 'position': [{3}, {4}]},
+                {'description': '01:50 PM - 03:05 PM', 'time': [[13, 50], [15, 5]], 'position': [{4}, {3}]},
+            ]
+        },
+        'courses': 4,
         'positions': {1, 2, 3, 4},
-        'question': 'Your Nth course on day 1 is this course. N = ?',
+        'cycle': {
+            'length': 2,
+            'duration': 'day',
+        },
+        'question': {
+            'prompt': 'Your Nth course on day 1 is this course. N = ?',
+            'choices': [
+                (1, 1),
+                (2, 2),
+                (3, 3),
+                (4, 4),
+            ]
+        }
     },
     'covid': {
-        'schedule': [
-            {'info': '08:45 - 12:30 (In person)', 'position': [{1}, {2}, {3}, {4}]},
-            {'info': '08:45 - 12:30 (At home)', 'position': [{2}, {1}, {4}, {3}]},
-            {'info': '14:00 - 15:15 (At home)', 'position': [{3, 4}, {3, 4}, {1, 2}, {1, 2}]},
-        ],
-        'days': 4,
+        'schedules': {
+            'default': [
+                {'description': '08:45 AM - 12:30 PM (In person)', 'time': [[8, 45], [12, 30]], 'position': [{1}, {2}, {3}, {4}]},
+                {'description': '08:45 AM - 12:30 PM (At home)', 'time': [[8, 45], [12, 30]], 'position': [{2}, {1}, {4}, {3}]},
+                {'description': '02:00 PM - 03:15 PM (At home)', 'time': [[14, 0], [15, 15]], 'position': [{3, 4}, {3, 4}, {1, 2}, {1, 2}]},
+            ],
+        },
+        'courses': 2,
         'positions': {1, 2, 3, 4},
-        'question': 'On which day are you in person for this course?',
+        'cycle': {
+            'length': 4,
+            'duration': 'day',
+        },
+        'question': {
+            'prompt': 'On which day are you in person for this course?',
+            'choices': [
+                (1, 1),
+                (2, 2),
+                (3, 3),
+                (4, 4),
+            ]
+        }
+    },
+    'week': {
+        'schedules': {
+            'default': [
+                {'description': '09:00 AM - 11:30 AM', 'time': [[9, 0], [11, 30]], 'position': [{1, 5, 7}, {3, 6, 7}]},
+                {'description': '12:15 PM - 02:45 PM', 'time': [[12, 15], [14, 45]], 'position': [{2, 5, 7}, {4, 6, 7}]},
+            ],
+            'late-start': [
+                {'description': '09:00 AM - 11:30 AM', 'time': [[9, 0], [11, 30]], 'position': [{1, 5, 7}, {3, 6, 7}]},
+                {'description': '12:15 PM - 02:45 PM', 'time': [[12, 15], [14, 45]], 'position': [{2, 5, 7}, {4, 6, 7}]},
+            ],
+            'early-dismissal': [
+                {'description': '09:00 AM - 11:30 AM', 'time': [[9, 0], [11, 30]], 'position': [{1, 5, 7}, {3, 6, 7}]},
+                {'description': '12:15 PM - 02:45 PM', 'time': [[12, 15], [14, 45]], 'position': [{2, 5, 7}, {4, 6, 7}]},
+            ],
+        },
+        'courses': 4,
+        'positions': {1, 2, 3, 4, 5, 6, 7},
+        'cycle': {
+            'length': 2,
+            'duration': 'week',
+        },
+        'question': {
+            'prompt': 'When do you have class for this course?',
+            'choices': [
+                (1, 'Week 1 Morning'),
+                (2, 'Week 1 Afternoon'),
+                (3, 'Week 2 Morning'),
+                (4, 'Week 2 Afternoon'),
+                (5, 'This course is a 2-credit Co-op in Week 1.'),
+                (6, 'This course is a 2-credit Co-op in Week 2.'),
+                (7, 'This course is a 4-credit Co-op.'),
+            ]
+        }
     },
 }
 
@@ -209,6 +281,10 @@ CORS_ALLOW_METHODS = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+# Select2 settings
+
+SELECT2_CACHE_BACKEND = 'default'
+
 # Misc settings
 
 SITE_ID = 1
@@ -216,6 +292,8 @@ SITE_ID = 1
 TOS_URL = '/terms'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 try:
     from courseshare.config import *

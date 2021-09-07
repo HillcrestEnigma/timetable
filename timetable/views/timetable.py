@@ -1,9 +1,9 @@
-from django.views.generic.edit import CreateView, FormView
+from django.views.generic.edit import CreateView, UpdateView, FormView
 from django.views.generic import DetailView
 from django.views import View
 from .. import models
 from . import mixins
-from ..forms import AddTimetableSelectTermForm, AddTimetableSelectCoursesForm
+from ..forms import AddTimetableSelectTermForm, TimetableSelectCoursesForm
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.decorators import method_decorator
@@ -30,7 +30,7 @@ class AddTimetableSelectCourses(LoginRequiredMixin, UserPassesTestMixin, CreateV
     template_name = 'timetable/timetable/add/select_courses.html'
     title = 'Add a Timetable'
     model = models.Timetable
-    form_class = AddTimetableSelectCoursesForm
+    form_class = TimetableSelectCoursesForm
 
     def test_func(self):
         term = get_object_or_404(models.Term, pk=self.kwargs['pk'])
@@ -72,3 +72,13 @@ class ViewTimetableData(View):
     def get(self, request, pk):
         timetable = get_object_or_404(models.Timetable, pk=pk)
         return JsonResponse({'courses': [i.code for i in timetable.courses.all()]})
+
+class TimetableUpdate(LoginRequiredMixin, UserPassesTestMixin, UpdateView, mixins.TitleMixin):
+    template_name = 'timetable/timetable/edit.html'
+    title = 'Edit Timetable'
+    model = models.Timetable
+    context_object_name = 'timetable'
+    form_class = TimetableSelectCoursesForm
+
+    def test_func(self):
+        return self.get_object().owner == self.request.user

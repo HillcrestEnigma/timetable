@@ -16,42 +16,103 @@ class School(models.Model):
     def get_ongoing_terms(self):
         return [term for term in self.terms.all() if term.is_ongoing()]
 
-def is_instructional(day, events):
-    return day.weekday() < 5 and not events.filter(is_instructional=False, start_date__lte=day, end_date__gt=day).exists()
-
 class Term(models.Model):
     name = models.CharField(max_length=128)
     school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='terms')
     description = models.TextField(blank=True)
-    num_courses = models.PositiveSmallIntegerField()
     timetable_format = models.CharField(max_length=64)
     start_date = models.DateField()
     end_date = models.DateField()
     is_frozen = models.BooleanField(default=True)
 
-    def get_absolute_url(self):
-        return reverse('view_term', kwargs={'pk': self.pk})
-
     def __str__(self):
         return self.name
 
-    def is_ongoing(self):
-        today = timezone.localdate()
-        if today >= self.start_date and today < self.end_date: return True
-        else: return False
+    def get_absolute_url(self):
+        return reverse('view_term', kwargs={'pk': self.pk})
 
-    def day(self):
-        events = Event.objects.filter(term=self, is_instructional=False)
-        today = timezone.localdate()
-        cur_iter_day = self.start_date
-        day_num = 0
-        if not is_instructional(today, events):
+    def start_datetime(self):
+        return timezone.make_aware(datetime.datetime.combine(self.start_date, datetime.time()))
+
+    def end_datetime(self):
+        return timezone.make_aware(datetime.datetime.combine(self.end_date, datetime.time(hour=23, minute=59, second=59)))
+
+    def is_ongoing(self, target_date=None):
+        if target_date == None:
+            target_date = timezone.localdate()
+        return target_date >= self.start_date and target_date < self.end_date
+
+    def day_is_instructional(self, target_date=None):
+        if target_date == None:
+            target_date = timezone.localdate()
+        target_date = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(hour=11, minute=00, second=00)))
+
+        return target_date.weekday() < 5 and not self.events.filter(is_instructional=False, start_date__lte=target_date, end_date__gte=target_date).exists()
+
+    def day_num(self, target_date=None):
+        cycle_duration = settings.TIMETABLE_FORMATS[self.timetable_format]['cycle']['duration']
+
+        if target_date == None:
+            target_date = timezone.localdate()
+        target_date = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(hour=23, minute=59, second=59)))
+
+        cur_iter_day = self.start_datetime().replace(hour=11, minute=0, second=0)
+        cycle_day_type_set = set()
+
+        if not self.is_ongoing(target_date.date()) or not self.day_is_instructional(target_date):
             return None
-        while cur_iter_day < today:
-            if is_instructional(cur_iter_day, events):
-                day_num += 1
+
+        while cur_iter_day <= target_date:
+            if self.day_is_instructional(cur_iter_day):
+                if cycle_duration == 'day':
+                    cycle_day_type_set.add(cur_iter_day.timetuple().tm_yday)
+                elif cycle_duration == 'week':
+                    cycle_day_type_set.add(cur_iter_day.isocalendar()[1])
+                else:
+                    raise NotImplementedError
             cur_iter_day += datetime.timedelta(1)
-        return day_num % settings.TIMETABLE_FORMATS[self.timetable_format]['days'] + 1
+
+        return (len(cycle_day_type_set) - 1) % settings.TIMETABLE_FORMATS[self.timetable_format]['cycle']['length'] + 1
+
+    def day_schedule_format(self, target_date=None):
+        if target_date == None:
+            target_date = timezone.localdate()
+        target_date = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(hour=11, minute=0, second=0)))
+
+        schedule_formats = settings.TIMETABLE_FORMATS[self.timetable_format]['schedules']
+        schedule_format_set = set(self.events.filter(start_date__lte=target_date, end_date__gte=target_date).values_list('schedule_format', flat=True)).intersection(set(schedule_formats.keys()))
+
+        for schedule_format in list(schedule_formats.keys())[::-1]:
+            if schedule_format in schedule_format_set: return schedule_format
+
+        return 'default'
+
+    def day_schedule(self, target_date=None):
+        if target_date == None:
+            target_date = timezone.localdate()
+
+        timetable_config = settings.TIMETABLE_FORMATS[self.timetable_format]
+        day_num = self.day_num(target_date=target_date)
+
+        if day_num is None:
+            return []
+
+        result = []
+
+        for i in timetable_config['schedules'][self.day_schedule_format(target_date=target_date)]:
+            start_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(*i['time'][0])))
+            end_time = timezone.make_aware(datetime.datetime.combine(target_date, datetime.time(*i['time'][1])))
+
+            result.append({
+                'description': i['description'],
+                'time': {
+                    'start': start_time,
+                    'end': end_time,
+                },
+                'courses': i['position'][day_num-1],
+            })
+
+        return result
 
 class Course(models.Model):
     code = models.CharField(max_length=16)
@@ -74,14 +135,16 @@ class Event(models.Model):
     name = models.CharField(max_length=128)
     term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name='events')
     description = models.TextField(blank=True)
-    start_date = models.DateField()
-    end_date = models.DateField()
-    is_instructional = models.BooleanField(default=False)
+
+    start_date = models.DateTimeField()
+    end_date = models.DateTimeField()
+
+    schedule_format = models.CharField(max_length=64, default='default')
+    is_instructional = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
 
     def is_ongoing(self):
-        today = timezone.localdate()
-        if today >= self.start_date and today < self.end_date: return True
-        else: return False
+        today = timezone.localtime()
+        return today >= self.start_date and today < self.end_date

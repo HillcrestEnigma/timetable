@@ -20,4 +20,5 @@ urlpatterns = [
     path('', include('timetable.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
+    path("select2/", include("django_select2.urls")),
 ]

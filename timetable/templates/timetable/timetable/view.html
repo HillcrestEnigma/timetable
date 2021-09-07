@@ -10,6 +10,9 @@
     <div class="card-body">
         <h5 class="card-title">{{ timetable.owner|user }}'s Timetable for {{ timetable.term.name }}</h5>
         {{ timetable|render_timetable }}
+        {% if timetable.owner == request.user %}
+        <a href="{% url 'update_timetable' timetable.pk %}">Update Timetable</a><br>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
